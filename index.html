@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Escáner de Refacciones</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    :root {
+      --bg: var(--tg-theme-bg-color, #121417);
+      --secondary-bg: var(--tg-theme-secondary-bg-color, #1c2026);
+      --text: var(--tg-theme-text-color, #f3f4f6);
+      --hint: var(--tg-theme-hint-color, #9ca3af);
+      --btn: var(--tg-theme-button-color, #2563eb);
+      --btn-text: var(--tg-theme-button-text-color, #ffffff);
+      --success: #10b981;
+      --danger: #ef4444;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .card {
+      background-color: var(--secondary-bg);
+      width: 100%;
+      max-width: 380px;
+      border-radius: 18px;
+      padding: 28px 22px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+    }
+
+    .badge {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--btn);
+      background: rgba(37, 99, 235, 0.14);
+      padding: 5px 12px;
+      border-radius: 999px;
+      margin-bottom: 16px;
+    }
+
+    .icon-box {
+      width: 72px;
+      height: 72px;
+      margin: 0 auto 18px;
+      border-radius: 16px;
+      background: rgba(37, 99, 235, 0.12);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .icon-box svg {
+      width: 38px;
+      height: 38px;
+      stroke: var(--btn);
+    }
+
+    h1 {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .subtitle {
+      font-size: 14px;
+      color: var(--hint);
+      line-height: 1.45;
+      margin-bottom: 22px;
+    }
+
+    .status {
+      font-size: 13px;
+      font-weight: 500;
+      padding: 12px 14px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+      background: rgba(156, 163, 175, 0.12);
+      color: var(--text);
+      word-break: break-word;
+    }
+
+    .status.success {
+      background: rgba(16, 185, 129, 0.16);
+      color: var(--success);
+    }
+
+    .status.error {
+      background: rgba(239, 68, 68, 0.16);
+      color: var(--danger);
+    }
+
+    .btn-primary {
+      width: 100%;
+      padding: 15px 18px;
+      border: none;
+      border-radius: 12px;
+      background-color: var(--btn);
+      color: var(--btn-text);
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.12s ease, opacity 0.15s ease;
+    }
+
+    .btn-primary:active {
+      transform: scale(0.98);
+      opacity: 0.9;
+    }
+
+    .btn-secondary {
+      width: 100%;
+      margin-top: 10px;
+      padding: 12px 18px;
+      border: none;
+      border-radius: 12px;
+      background: transparent;
+      color: var(--hint);
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+
+    .footer-note {
+      margin-top: 18px;
+      font-size: 12px;
+      color: var(--hint);
+      opacity: 0.8;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="badge">Mantenimiento Industrial</div>
+
+    <div class="icon-box">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="7" height="7" rx="1"></rect>
+        <rect x="14" y="3" width="7" height="7" rx="1"></rect>
+        <rect x="3" y="14" width="7" height="7" rx="1"></rect>
+        <path d="M14 14h3v3h-3zM20 14v3h-3M14 20h6"></path>
+      </svg>
+    </div>
+
+    <h1>Escáner de Refacciones</h1>
+    <p class="subtitle">Enfoca la etiqueta QR de la gaveta para enviar el código automáticamente al inventario.</p>
+
+    <div id="statusBox" class="status">Iniciando cámara nativa...</div>
+
+    <button id="btnScan" class="btn-primary" onclick="abrirEscaner()">
+      Abrir Escáner QR
+    </button>
+
+    <button class="btn-secondary" onclick="cerrarApp()">
+      Cancelar y volver al chat
+    </button>
+  </div>
+
+  <p class="footer-note">Control de Inventario · Lectura Nativa</p>
+
+  <script>
+    const tg = window.Telegram ? window.Telegram.WebApp : null;
+    const statusBox = document.getElementById("statusBox");
+    let codigoEnviado = false;
+
+    function actualizarEstado(texto, tipo) {
+      statusBox.textContent = texto;
+      statusBox.className = "status" + (tipo ? " " + tipo : "");
+    }
+
+    function abrirEscaner() {
+      if (!tg || tg.platform === "unknown") {
+        actualizarEstado("Abre esta herramienta desde el botón del bot dentro de Telegram.", "error");
+        return;
+      }
+
+      if (!tg.isVersionAtLeast || !tg.isVersionAtLeast("6.4")) {
+        actualizarEstado("Tu versión de Telegram no soporta el escáner nativo. Actualiza la app.", "error");
+        return;
+      }
+
+      codigoEnviado = false;
+      actualizarEstado("Apunta la cámara hacia el código QR...", "");
+
+      tg.showScanQrPopup(
+        { text: "Enfoca el código QR de la refacción" },
+        function (datoLeido) {
+          const codigoLimpio = (datoLeido || "").trim();
+          if (!codigoLimpio) return false;
+
+          codigoEnviado = true;
+
+          if (tg.HapticFeedback) {
+            tg.HapticFeedback.notificationOccurred("success");
+          }
+
+          actualizarEstado("Detectado: " + codigoLimpio, "success");
+
+          // Envía el texto directo al bot y cierra la Mini App automáticamente
+          setTimeout(function () {
+            tg.sendData(codigoLimpio);
+          }, 150);
+
+          return true; // Cierra el lector de cámara nativo
+        }
+      );
+    }
+
+    function cerrarApp() {
+      if (tg) tg.close();
+    }
+
+    // Inicialización automática al abrir la Mini App
+    window.addEventListener("load", function () {
+      if (!tg) {
+        actualizarEstado("No se detectó el entorno de Telegram.", "error");
+        return;
+      }
+
+      tg.ready();
+      tg.expand();
+
+      // Si el usuario cierra la cámara sin escanear, avisa en pantalla
+      tg.onEvent("scanQrPopupClosed", function () {
+        if (!codigoEnviado) {
+          actualizarEstado("Escaneo cancelado. Toca el botón para intentar de nuevo.", "");
+        }
+      });
+
+      // Dispara la cámara automáticamente tras un breve respiro de renderizado
+      setTimeout(abrirEscaner, 250);
+    });
+  </script>
+</body>
+</html>
